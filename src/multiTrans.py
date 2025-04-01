@@ -15,12 +15,13 @@ from typing import List, Optional, Tuple, Union, Any, Dict
 from torch.utils.data._utils.collate import default_collate
 from sklearn.metrics import roc_auc_score
 
-from transformers import BertModel, PretrainedConfig, AutoModelForCausalLM
+from transformers import BertModel, PretrainedConfig, AutoModelForCausalLM, GenerationMixin
 from transformers.models.bert.modeling_bert import BertPreTrainedModel, BertOnlyMLMHead, SequenceClassifierOutput
 from transformers.modeling_outputs import BaseModelOutput, Seq2SeqLMOutput, ModelOutput
 from transformers.modeling_utils import PreTrainedModel
 from transformers.utils import  logging
 from transformers.models.encoder_decoder.configuration_encoder_decoder import EncoderDecoderConfig
+from dataclasses import dataclass
 import warnings
 import copy
 import numpy as np
@@ -338,6 +339,7 @@ class TCRDataset(data.Dataset):
 
 ### MODELING
 
+@dataclass
 class ClassifCausalLMOutputWithCrossAttentions(ModelOutput):
     lm_loss: Optional[torch.FloatTensor] = None
     lossCLS: Optional[torch.FloatTensor] = None
@@ -369,7 +371,7 @@ class BertLastPooler(nn.Module):
 
 
 
-class TulipPetal(BertPreTrainedModel):
+class TulipPetal(BertPreTrainedModel, GenerationMixin):
     """ TULIP decoder models. """
     def __init__(self, config):
         super().__init__(config)
@@ -513,15 +515,16 @@ class TulipPetal(BertPreTrainedModel):
 
 
 
+@dataclass
 class ED_LMOutput(ModelOutput):
     clf_loss: Optional[torch.FloatTensor] = None
     clf_logits: Optional[torch.FloatTensor] = None
-    decoder_outputsA = None
-    encoder_outputsA = None
-    decoder_outputsB = None
-    encoder_outputsB = None
-    decoder_outputsE = None
-    encoder_outputsE = None
+    decoder_outputsA: Optional[torch.FloatTensor] = None
+    encoder_outputsA: Optional[torch.FloatTensor] = None
+    decoder_outputsB: Optional[torch.FloatTensor] = None
+    encoder_outputsB: Optional[torch.FloatTensor] = None
+    decoder_outputsE: Optional[torch.FloatTensor] = None
+    encoder_outputsE: Optional[torch.FloatTensor] = None
 
 
 logger = logging.get_logger(__name__)
@@ -546,7 +549,7 @@ def shift_tokens_right(input_ids: torch.Tensor, pad_token_id: int, decoder_start
 
 
 
-class Tulip(PreTrainedModel):
+class Tulip(PreTrainedModel, GenerationMixin):
     config_class = EncoderDecoderConfig
     base_model_prefix = "encoder_decoder"
 
@@ -828,7 +831,7 @@ class Tulip(PreTrainedModel):
         mhc=None,
         togenerate=None,
         **kwargs,
-    ) -> Union[Tuple, Seq2SeqLMOutput]:
+    ) -> Seq2SeqLMOutput | ED_LMOutput:
         # print('forward', input_ids)
         input_idsA=input_ids[0]
         input_idsB=input_ids[1]
@@ -1069,14 +1072,14 @@ class Tulip(PreTrainedModel):
 
         else:
             return ED_LMOutput(
-                loss = lossCLS,
+                clf_loss = lossCLS,
                 clf_logits=logits,
-                encoder_outputsA = encoder_outputsA,
                 decoder_outputsA = decoder_outputsA,
-                encoder_outputsB = encoder_outputsB,
+                encoder_outputsA = encoder_outputsA,
                 decoder_outputsB = decoder_outputsB,
-                encoder_outputsE = encoder_outputsE,
+                encoder_outputsB = encoder_outputsB,
                 decoder_outputsE = decoder_outputsE,
+                encoder_outputsE = encoder_outputsE,
             )
 
 
