@@ -11,7 +11,7 @@ import torch.nn.functional as F
 import torch
 import torch.utils.data as data
 from torch.nn import MSELoss, CrossEntropyLoss, BCEWithLogitsLoss
-from typing import List, Optional, Tuple, Union, Any, Dict
+from typing import List, Optional, Tuple, Union, Any, Dict, Self
 from torch.utils.data._utils.collate import default_collate
 from sklearn.metrics import roc_auc_score
 
@@ -185,14 +185,18 @@ class TCRDataset(data.Dataset):
         return new
     
     def select_peptide(self, target_peptide ):
+        print("got here")
         new = self.__class__.empty_init(self.tokenizer, self.device, self.mhctok)
         for i in range(len(self)):
+            print(self.peptide[i])
+            print(self.peptide[i] in target_peptide)
             if self.peptide[i] in target_peptide:
                 new.append(MHC=self.MHC[i], alpha=self.alpha[i], beta=self.beta[i], peptide=self.peptide[i], binder=self.binder[i])
         return new
     
-    def select_chain(self, target_chain:str='both'):
+    def select_chain(self, target_chain:str='both') -> Self:
         """
+        Returns a new TCRDataset that contains only the subset for which the target_chain is not missing.
         target_chain: 'both', 'alpha', 'beta'
 
         """
@@ -415,7 +419,7 @@ class TulipPetal(BertPreTrainedModel, GenerationMixin):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ) -> Union[Tuple[torch.Tensor], SequenceClassifierOutput]:
+    ) -> ClassifCausalLMOutputWithCrossAttentions:
         return_dict = True# return_dict if return_dict is not None else self.config.use_return_dict
         if labels is not None:
           use_cache = False
@@ -1008,7 +1012,7 @@ class Tulip(PreTrainedModel, GenerationMixin):
 
         if togenerate not in ['A','B']:
             labelsE = (labels, input_idsE)
-            decoder_outputsE = self.decoderE(
+            decoder_outputsE: ClassifCausalLMOutputWithCrossAttentions = self.decoderE(
                 input_ids = input_idsE,
                 attention_mask = attention_maskE,
                 encoder_hidden_states = torch.cat([mhc_encoded,encoder_hidden_statesA, encoder_hidden_statesB], dim=1),
